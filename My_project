@@ -1,0 +1,131 @@
+# MINOR PROJECT: Courier Management System
+# Tech: Python Tkinter + SQLite Database
+# Features: Add, Track, Update, Delete, Search
+
+import tkinter as tk
+from tkinter import ttk, messagebox
+import sqlite3
+
+# --- DATABASE SETUP ---
+conn = sqlite3.connect("courier.db")
+cursor = conn.cursor()
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS couriers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sender TEXT,
+    receiver TEXT,
+    phone TEXT,
+    address TEXT,
+    place TEXT,
+    weight TEXT,
+    status TEXT
+)
+""")
+conn.commit()
+
+# --- FUNCTIONS ---
+def add_courier():
+    if not e_sender.get() or not e_receiver.get():
+        messagebox.showwarning("Warning", "Sender & Receiver name venam!")
+        return
+    cursor.execute("INSERT INTO couriers (sender, receiver, phone, address, place, weight, status) VALUES (?,?,?,?,?,?,?)",
+                   (e_sender.get(), e_receiver.get(), e_phone.get(), e_address.get(), e_place.get(), e_weight.get(), "Booked - Kochi Hub"))
+    conn.commit()
+    messagebox.showinfo("Success", f"Courier Booked! ID: {cursor.lastrowid}")
+    clear_fields()
+    view_all()
+
+def view_all():
+    for row in tree.get_children():
+        tree.delete(row)
+    cursor.execute("SELECT * FROM couriers")
+    for row in cursor.fetchall():
+        tree.insert("", "end", values=row)
+
+def search_courier():
+    tid = e_search.get()
+    if not tid:
+        view_all()
+        return
+    for row in tree.get_children():
+        tree.delete(row)
+    cursor.execute("SELECT * FROM couriers WHERE id=?", (tid,))
+    for row in cursor.fetchall():
+        tree.insert("", "end", values=row)
+
+def update_status():
+    selected = tree.selection()
+    if not selected:
+        messagebox.showwarning("Warning", "Oru courier select cheyyu!")
+        return
+    item = tree.item(selected[0])['values']
+    new_status = combo_status.get()
+    cursor.execute("UPDATE couriers SET status=? WHERE id=?", (new_status, item[0]))
+    conn.commit()
+    messagebox.showinfo("Updated", "Status Updated!")
+    view_all()
+
+def delete_courier():
+    selected = tree.selection()
+    if not selected:
+        return
+    item = tree.item(selected[0])['values']
+    cursor.execute("DELETE FROM couriers WHERE id=?", (item[0],))
+    conn.commit()
+    view_all()
+
+def clear_fields():
+    for e in [e_sender, e_receiver, e_phone, e_address, e_place, e_weight]:
+        e.delete(0, tk.END)
+
+# --- GUI ---
+root = tk.Tk()
+root.title("Courier Management System - Minor Project")
+root.geometry("900x600")
+root.configure(bg="#f0f0f0")
+
+tk.Label(root, text="COURIER MANAGEMENT SYSTEM", font=("Arial", 16, "bold"), bg="#f0f0f0").pack(pady=10)
+
+frame = tk.Frame(root, bg="#f0f0f0")
+frame.pack(pady=5)
+
+# Input Fields
+labels = ["Sender Name:", "Receiver Name:", "Phone:", "Address:", "Destination:", "Weight (kg):"]
+entries = []
+for i, txt in enumerate(labels):
+    tk.Label(frame, text=txt, bg="#f0f0f0").grid(row=i, column=0, sticky="w", padx=5, pady=3)
+    e = tk.Entry(frame, width=40)
+    e.grid(row=i, column=1, padx=5, pady=3)
+    entries.append(e)
+
+e_sender, e_receiver, e_phone, e_address, e_place, e_weight = entries
+
+# Buttons
+btn_frame = tk.Frame(root, bg="#f0f0f0")
+btn_frame.pack(pady=10)
+tk.Button(btn_frame, text="Add Courier", bg="#4CAF50", fg="white", command=add_courier).grid(row=0, column=0, padx=5)
+tk.Button(btn_frame, text="Delete", bg="#f44336", fg="white", command=delete_courier).grid(row=0, column=1, padx=5)
+
+# Search + Status
+search_frame = tk.Frame(root, bg="#f0f0f0")
+search_frame.pack(pady=5)
+tk.Label(search_frame, text="Tracking ID:", bg="#f0f0f0").grid(row=0, column=0)
+e_search = tk.Entry(search_frame, width=15)
+e_search.grid(row=0, column=1, padx=5)
+tk.Button(search_frame, text="Search / Track", command=search_courier).grid(row=0, column=2, padx=5)
+tk.Label(search_frame, text="Status:", bg="#f0f0f0").grid(row=0, column=3, padx=10)
+combo_status = ttk.Combobox(search_frame, values=["Booked - Kochi Hub", "In Transit", "Out for Delivery", "Delivered ✅"])
+combo_status.set("In Transit")
+combo_status.grid(row=0, column=4)
+tk.Button(search_frame, text="Update Status", command=update_status).grid(row=0, column=5, padx=5)
+
+# Table
+cols = ("ID", "Sender", "Receiver", "Phone", "Address", "Place", "Weight", "Status")
+tree = ttk.Treeview(root, columns=cols, show="headings")
+for col in cols:
+    tree.heading(col, text=col)
+    tree.column(col, width=100)
+tree.pack(fill="both", expand=True, padx=10, pady=10)
+
+view_all()
+root.mainloop()
